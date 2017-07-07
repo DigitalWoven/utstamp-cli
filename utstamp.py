@@ -55,7 +55,7 @@ def verify_response(payload, checksum):
 # if success returns 0
 # if collision returns 1
 # otherwise returns 2
-def stamp(path, file, args):
+def submit_files(path, file, args):
 
     relpath = os.path.join(path, file)
     checksum = sha256_checksum(relpath)
@@ -123,34 +123,8 @@ def resolveFiles(paths, recursive, hidden_files, depth):
 
     return files
 
-def check_positive(value):
-    ivalue = int(value)
-    if ivalue <= 0:
-         raise argparse.ArgumentTypeError(
-            "{0} is an invalid positive int value".format(value))
-    return ivalue
-
-
-def main():
-
-    parser = argparse.ArgumentParser(description="Uploads files to utstamp.")
-    parser.add_argument('-r', action='store_true', default=False,
-                help="whether to recursively upload files from subdirectories")
-    parser.add_argument('-d', type=check_positive, default=0,
-        help="how deep to recurse (the lowest value of 1 does not step into any subdirectories)")
-    parser.add_argument('--hidden-files', action='store_true',
-                default=False, help="includes files starting with . (only has an effect when used with -r)")
-    parser.add_argument('--include-path', action='store_true', default=False,
-                help="include path to file and file name in submission")
-    parser.add_argument('--user',
-                help="user_id for submission")
-    parser.add_argument('--endpoint', default='https://api.utstamp.com/submit',
-                help="defaults to https://api.utstamp.com/submit")
-    parser.add_argument('--retries', type=check_positive, default=3,
-                help="defaults to 3")
-    parser.add_argument('paths', nargs='+')
-    args = parser.parse_args()
-
+# Handler for stamp subcommand
+def stamp(args):
 
     print("Scanning files... ", end='')
     try:
@@ -163,12 +137,69 @@ def main():
 
     print("Uploading files...")
     for path, file in tqdm(files):
-        res = stamp(path, file, args)
+        res = submit_files(path, file, args)
 
         if res == 1:
             tqdm.write("collision: {0}".format(os.path.join(path, file)))
         elif res == 2:
             tqdm.write("failure: {0}".format(os.path.join(path, file)))
+
+
+# Handler for query subcommand
+def query(args):
+    payload = {
+        "data_query": {
+            "request": {
+                "token_id": args.hash
+            }
+        }
+    }
+
+    r = requests.post(args.endpoint, data=json.dumps(payload))
+
+    print(json.dumps(r.json(), indent=2))
+
+# Checks value is positive integer
+def check_positive(value):
+    ivalue = int(value)
+    if ivalue <= 0:
+         raise argparse.ArgumentTypeError(
+            "{0} is an invalid positive int value".format(value))
+    return ivalue
+
+def main():
+
+    parser = argparse.ArgumentParser(description="UTStamp command line tool")
+    parser.add_argument('--endpoint', default='https://api.utstamp.com/submit',
+                        help="defaults to https://api.utstamp.com/submit")
+    parser.add_argument('--retries', type=check_positive, default=3,
+                        help="defaults to 3")
+
+    subparsers = parser.add_subparsers(
+        help="run -h with subcommand for additional help")
+
+    stamp_subparser = subparsers.add_parser('stamp', help='stamps files')
+    stamp_subparser.set_defaults(func=stamp)
+    stamp_subparser.add_argument('paths', nargs='+')
+    stamp_subparser.add_argument('-r', action='store_true', default=False,
+                help="whether to recursively upload files from subdirectories")
+    stamp_subparser.add_argument('-d', type=check_positive, default=0,
+        help="how deep to recurse (the lowest value of 1 does not step into any subdirectories)")
+    stamp_subparser.add_argument('--hidden-files', action='store_true',
+                default=False, help="includes files starting with . (only has an effect when used with -r)")
+    stamp_subparser.add_argument('--include-path', action='store_true', default=False,
+                help="include path to file and file name in submission")
+    stamp_subparser.add_argument('--user',
+                help="user_id for submission")
+
+    query_subparser = subparsers.add_parser('query', help='query for stamps')
+    query_subparser.set_defaults(func=query)
+    query_subparser.add_argument('hash',
+        help="queries a hash/string instead of stamping files")
+
+
+    args = parser.parse_args()
+    args.func(args)
 
 
 if __name__ == '__main__':
