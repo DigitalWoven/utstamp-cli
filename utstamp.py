@@ -94,6 +94,7 @@ def submit_files(path, file, args):
 def resolveFiles(paths, recursive, hidden_files, depth):
 
     files = []
+    recursive_files = []
     for path in paths:
         if os.path.isfile(path):
             files.extend([os.path.split(path)])
@@ -104,7 +105,7 @@ def resolveFiles(paths, recursive, hidden_files, depth):
                 curdepth = 0
                 for root, dirs, curfiles in os.walk(path):
                     for file in curfiles:
-                        files.extend([(root, file)])
+                        recursive_files.extend([(root, file)])
 
                     curdepth = curdepth + 1
                     if curdepth >= depth and depth != 0:
@@ -119,9 +120,10 @@ def resolveFiles(paths, recursive, hidden_files, depth):
 
 
     if not hidden_files:
-        files = list(filter(lambda pathfile: pathfile[1][0] != '.', files))
+        recursive_files = list(
+            filter(lambda pathfile: pathfile[1][0] != '.', recursive_files))
 
-    return files
+    return files + recursive_files
 
 # Handler for stamp subcommand
 def stamp(args):
