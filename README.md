@@ -9,14 +9,13 @@ See https://utstamp.com to view our web interface.
 
 ### Usage instructions:
 
-utstamp.py:
-Stamps a file or directory.
+The main script is utstamp.py.
 Run with `./utstamp.py [options]`.
 To see help, run `./utstamp.py -h`.
 
 There are two subcommands supported by the utstamp.py script, stamp and submit.
 
-Running `./utstamp.py stamp -h FILE` will stamp the given file,
+Running `./utstamp.py stamp FILE` will stamp the given file,
 and running `./utstamp.py stamp -r DIRECTORY` will stamp all files in the directory.
 For additional options, view help with `./ustamp.py stamp -h`.
 
@@ -25,7 +24,7 @@ For additional options, view help with `./ustamp.py query -h`.
 
 ### Testing instructions:
 
-generate.py:
-Generates a random file structure for demo purposes.
+#### generate.py:
+Generates a random file structure for testing purposes.
 You can change parameters within the file to change generation behavior.
-Run with `python generate.py`
+Run with `python generate.py`.
