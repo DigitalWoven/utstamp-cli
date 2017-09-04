@@ -13,7 +13,7 @@ The main script is utstamp.py.
 Run with `./utstamp.py [options]`.
 To see help, run `./utstamp.py -h`.
 
-There are two subcommands supported by the utstamp.py script, stamp and submit.
+There are two subcommands supported by the utstamp.py script, `stamp` and `query`.
 
 Running `./utstamp.py stamp FILE` will stamp the given file,
 and running `./utstamp.py stamp -r DIRECTORY` will stamp all files in the directory.
