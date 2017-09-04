@@ -87,6 +87,12 @@ celerybeat-schedule
 venv/
 ENV/
 
+# pycharm/jetbrain ide
+.idea
+
+# macOS file
+.DS_Store
+
 # Spyder project settings
 .spyderproject
 .spyproject
