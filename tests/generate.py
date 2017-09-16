@@ -13,14 +13,18 @@ DIRECTORY_CREATION_PROBABILITY = 0.4
 FILES_PER_DIRECTORY = 5
 FILE_SIZE = (512, 2048) #bytes
 
+
 def random_extension():
     return ''.join(random.choice(string.ascii_lowercase) for i in range(3))
+
 
 def random_name():
     return uuid.uuid4().hex
 
+
 def random_file_name():
     return '.'.join([random_name(), random_extension()])
+
 
 # https://stackoverflow.com/questions/431684/how-do-i-cd-in-python/24176022
 @contextmanager
@@ -31,6 +35,7 @@ def cd(newdir):
         yield
     finally:
         os.chdir(prevdir)
+
 
 def generate(depth):
 

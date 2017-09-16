@@ -83,6 +83,8 @@ def submit_files(path, file, args):
 
     for i in range(args.retries):
         r = requests.post(args.endpoint, data=json.dumps(payload))
+        # output hash val to user, otherwise they do not know how to query
+        print(relpath + ' | hash: ' + checksum)
         veracity = verify_response(r.json(), checksum)
 
         if veracity < 2:
@@ -128,6 +130,35 @@ def resolveFiles(paths, recursive, hidden_files, depth):
 # Handler for stamp subcommand
 def stamp(args):
 
+    # stamp string.
+    if args.s:
+        data = args.paths[0].encode('utf-8')
+        print(args.paths[0])
+        hash_object = hashlib.sha256(data)
+        hex_dig = hash_object.hexdigest()
+        print(hex_dig)
+
+        payload = {
+            'submit_data': {
+                'request': {
+                    'submit_data': [
+                        {'hash_key': hex_dig}
+                    ]
+                }
+            }
+        }
+
+        r = requests.post(args.endpoint, data=json.dumps(payload))
+        veracity = verify_response(r.json(), hex_dig)
+        if veracity == 0:
+            print("success.")
+        elif veracity == 1:
+            print("the text has already been stamped. You can query the status now.")
+        else:
+            print("error")
+
+        return
+
     print("Scanning files... ", end='')
     try:
         files = resolveFiles(args.paths, args.r, args.hidden_files, args.d)
@@ -135,6 +166,7 @@ def stamp(args):
         print(err)
         return
     print("Found {0} files.".format(len(files)))
+    # print(files)
 
 
     print("Uploading files...")
@@ -183,6 +215,8 @@ def main():
     stamp_subparser = subparsers.add_parser('stamp', help='stamps files')
     stamp_subparser.set_defaults(func=stamp)
     stamp_subparser.add_argument('paths', nargs='+')
+    stamp_subparser.add_argument('-s', action='store_true', default=False,
+                                 help="stamp string instead of files")
     stamp_subparser.add_argument('-r', action='store_true', default=False,
                 help="whether to recursively upload files from subdirectories")
     stamp_subparser.add_argument('-d', type=check_positive, default=0,
@@ -201,6 +235,7 @@ def main():
 
 
     args = parser.parse_args()
+    # import pdb;pdb.set_trace()
     if 'func' in args:
         args.func(args)
     else:

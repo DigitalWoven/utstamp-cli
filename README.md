@@ -9,17 +9,23 @@ See https://utstamp.com to view our web interface.
 
 ### Usage instructions:
 
-The main script is utstamp.py.
-Run with `./utstamp.py [options]`.
-To see help, run `./utstamp.py -h`.
+The main script is utstamp.py.  
+Run with `./utstamp.py [options]`.  
+To see help, run `./utstamp.py -h`. 
 
 There are two subcommands supported by the utstamp.py script, `stamp` and `query`.
 
-Running `./utstamp.py stamp FILE` will stamp the given file,
-and running `./utstamp.py stamp -r DIRECTORY` will stamp all files in the directory.
+* Stamp
+
+Stamp text: `./utstamp.py stamp -s "i am the text."`  
+Stamp a given file: `./utstamp.py stamp FILE`  
+Stamp all files in the directory: `./utstamp.py stamp -r DIRECTORY`  
+
 For additional options, view help with `./ustamp.py stamp -h`.
 
-Running `./utstamp.py query HASH` will query for a stamp with the given HASH.
+* Query
+
+Query hash:  `./utstamp.py query HASH`  
 For additional options, view help with `./ustamp.py query -h`.
 
 ### Testing instructions:
