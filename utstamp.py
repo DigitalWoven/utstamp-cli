@@ -21,6 +21,18 @@ class UTStampCLI(object):
     def __init__(self, cli_args):
         self.cli_args = cli_args
 
+    def request_api(self, payload):
+        endpoint = self.cli_args.endpoint
+        license_key = self.cli_args.license_key
+
+        headers = {'license_key': license_key}
+
+        if len(license_key) > 0:
+            r = requests.post(endpoint, data=json.dumps(payload), headers=headers)
+        else:
+            r = requests.post(endpoint, data=json.dumps(payload))
+        return r
+
     def stamp(self):
         if self.cli_args.s:
             self.stamp_string()
@@ -63,7 +75,8 @@ class UTStampCLI(object):
             }
         }
 
-        r = requests.post(args.endpoint, data=json.dumps(payload))
+        r = self.request_api(payload)
+        # r = requests.post(args.endpoint, data=json.dumps(payload))
         veracity = self.verify_response(r.json(), hex_dig)
         if veracity == SUCCESS:
             print("success.")
@@ -84,7 +97,8 @@ class UTStampCLI(object):
             }
         }
 
-        r = requests.post(args.endpoint, data=json.dumps(payload))
+        # r = requests.post(args.endpoint, data=json.dumps(payload))
+        r = self.request_api(payload)
         print(json.dumps(r.json(), indent=2))
 
     def resolve_files(self):
@@ -151,7 +165,9 @@ class UTStampCLI(object):
         }
 
         for i in range(args.retries):
-            r = requests.post(args.endpoint, data=json.dumps(payload))
+            # r = requests.post(args.endpoint, data=json.dumps(payload))
+            r = self.request_api(payload)
+
             # output hash val to user, otherwise they do not know how to query
             print(relpath + ' | hash: ' + checksum)
             veracity = self.verify_response(r.json(), checksum)
@@ -228,6 +244,8 @@ def init_parser():
     parser = argparse.ArgumentParser(description="UTStamp command line tool")
     parser.add_argument('--endpoint', default='https://api.utstamp.com/submit',
                         help="defaults to https://api.utstamp.com/submit")
+    parser.add_argument('--license_key', default='',
+                        help="defaults to be empty")
     parser.add_argument('--retries', type=UTStampCLI.check_positive, default=3,
                         help="defaults to 3")
 
