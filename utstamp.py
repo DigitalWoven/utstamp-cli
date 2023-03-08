@@ -109,15 +109,15 @@ class UTStampCLI(object):
             self.stamp_files()
 
     def stamp_files(self):
-        print("Scanning files... ", end='')
+        tqdm.write("Scanning files... ", end='')
         try:
             files = self.resolve_files()
         except ValueError as err:
-            print(err)
+            tqdm.write(err)
             return
-        print("Found {0} files.".format(len(files)))
+        tqdm.write("Found {0} files.".format(len(files)))
 
-        print("Uploading files...")
+        tqdm.write("Uploading files...")
         for path, file in tqdm(files):
             res = self.submit_files(path, file)
 
