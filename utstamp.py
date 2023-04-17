@@ -24,6 +24,7 @@ class UTStampResult(Enum):
     ERROR = 2
     COLLISION = 3
     SOME_COLLISION = 4
+    FORBIDDEN = 5
 
     def human_readable(self) -> str:
         """
@@ -41,6 +42,8 @@ class UTStampResult(Enum):
             return "All submissions have already been processed. You can query the status now."
         elif self == UTStampResult.SOME_COLLISION:
             return "Some submissions have already been processed, but others are still ongoing. You can check their status now."
+        elif self == UTStampResult.FORBIDDEN:
+            return "Forbidden! Please check your license key."
 
 
 class UTStampCLI(object):
@@ -78,6 +81,8 @@ class UTStampCLI(object):
                 else:
                     r = requests.post(url, data=json.dumps(payload))
                 r_json = r.json()
+                if r.status_code == 403:
+                  return UTStampResult.FORBIDDEN
                 if r.status_code == 200 and r_json['message'] == 'success' and r_json['all_success']:
                   return UTStampResult.SUCCESS
                 if r.status_code == 200 and len(r_json['failed_chunks']) > 0 and not r_json['all_success']:
