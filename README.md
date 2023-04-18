@@ -1,38 +1,28 @@
-This is a command line tool for timestamping files using the utstamp service.
-See https://utstamp.com to view our web interface.
+This document provides instructions on how to use a command line tool for timestamping files using the UTStamp service. For a web interface, please visit https://utstamp.com.
 
-### Requirements:
+## Requirements:
 
-* Python >=3.5
-* Pip
-* Pip packages in requirements.txt. Install using `pip install -r requirements.txt`.
+1. Python >=3.5
+2. Pip
+3. Pip packages listed in requirements.txt (install using the command: `pip install -r requirements.txt`)
 
-### Usage instructions:
+## Usage instructions:
 
-The main script is utstamp.py.  
-Run with `./utstamp.py [options]`.  
-To see help, run `./utstamp.py -h`. 
+The main script is utstamp.py. Execute the script by running `./utstamp.py [options]`. To view help, run `./utstamp.py -h`.
 
-There are two subcommands supported by the utstamp.py script, `stamp` and `query`.
+The utstamp.py script supports two subcommands: stamp and query.
 
-* Stamp
+### Stamp
 
-Firstly, you should obtain the license key from your [portal](https://www.utstamp.com/portal). It is a UUID string.
+First, obtain the license key from your [portal](https://www.utstamp.com/portal), which is a UUID string.
 
-Stamp text: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp -s "i am the text."`  
-Stamp a given file: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp FILE`  
-Stamp all files in the directory: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp -r DIRECTORY`  
+1. Stamp text: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp -s "i am the text."`  
+2. Stamp a given file: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp FILE`  
+3. Stamp all files in the directory: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp -r DIRECTORY`  
 
 For additional options, view help with `./ustamp.py stamp -h`.
 
-* Query
+### Query
 
 Query hash:  `./utstamp.py query HASH`  
 For additional options, view help with `./ustamp.py query -h`.
-
-### Testing instructions:
-
-#### generate.py:
-Generates a random file structure for testing purposes.
-You can change parameters within the file to change generation behavior.
-Run with `python generate.py`.
