@@ -17,9 +17,11 @@ There are two subcommands supported by the utstamp.py script, `stamp` and `query
 
 * Stamp
 
-Stamp text: `./utstamp.py stamp -s "i am the text."`  
-Stamp a given file: `./utstamp.py stamp FILE`  
-Stamp all files in the directory: `./utstamp.py stamp -r DIRECTORY`  
+Firstly, you should obtain the license key from your [portal](https://www.utstamp.com/portal). It is a UUID string.
+
+Stamp text: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp -s "i am the text."`  
+Stamp a given file: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp FILE`  
+Stamp all files in the directory: `./utstamp.py --license_key 00000000-0000-0000-0000-000000000000 stamp -r DIRECTORY`  
 
 For additional options, view help with `./ustamp.py stamp -h`.
 

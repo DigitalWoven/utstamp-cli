@@ -1,37 +1,129 @@
 #!/usr/bin/env python3
 
 # python modules
+import datetime
 import argparse
 import hashlib
 import json
 import os
+from enum import Enum
+from urllib.parse import urljoin
 
 # external modules
 import requests
 from tqdm import tqdm
-from deepdiff import DeepDiff
 
-SUCCESS = 'success'
-ERROR = 'error'
-COLLISION = 'collision'
+LICENSE_KEY_HEADER = 'license_key'
+
+
+class UTStampResult(Enum):
+    """
+    UTStampResult is the result of a UTStamp API call.
+    """
+    SUCCESS = 1
+    ERROR = 2
+    COLLISION = 3
+    SOME_COLLISION = 4
+    FORBIDDEN = 5
+
+    def human_readable(self) -> str:
+        """
+        Get a human-readable string for the result.
+
+        Returns:
+            str: The human-readable string.
+
+        """
+        if self == UTStampResult.SUCCESS:
+            return "Success! You can query the status later."
+        elif self == UTStampResult.ERROR:
+            return "Unknown error. Please try again later."
+        elif self == UTStampResult.COLLISION:
+            return "All submissions have already been processed. You can query the status now."
+        elif self == UTStampResult.SOME_COLLISION:
+            return "Some submissions have already been processed, but others are still ongoing. You can check their status now."
+        elif self == UTStampResult.FORBIDDEN:
+            return "Forbidden! Please check your license key."
 
 
 class UTStampCLI(object):
+    """
+    UTStampCLI is the command line interface for the UTStamp API.
+    """
 
-    def __init__(self, cli_args):
+    def __init__(self, cli_args: argparse.Namespace):
         self.cli_args = cli_args
 
-    def request_api(self, payload):
-        endpoint = self.cli_args.endpoint
-        license_key = self.cli_args.license_key
+    def call_stamp(self, hash_list: list) -> UTStampResult:
+        """
+        Stamp the given hash list.
 
-        headers = {'license_key': license_key}
+        Args:
+            hash_list (list): The hash list to stamp.
 
-        if len(license_key) > 0:
-            r = requests.post(endpoint, data=json.dumps(payload), headers=headers)
-        else:
-            r = requests.post(endpoint, data=json.dumps(payload))
-        return r
+        Returns:
+            UTStampResult: The result of the stamp.
+        """
+        payload: dict = {"entries": [{"hash": hash} for hash in hash_list]}
+
+        endpoint: str = self.cli_args.endpoint
+        url: str = urljoin(endpoint, "submissions")
+        license_key: str = self.cli_args.license_key
+
+        for _ in range(self.cli_args.retries):
+            # retry if the server returns an error
+            try:
+                if len(license_key) > 0:
+                    headers: dict = {LICENSE_KEY_HEADER: license_key}
+                    r: requests.Response = requests.post(
+                        url, data=json.dumps(payload), headers=headers
+                    )
+                else:
+                    r = requests.post(url, data=json.dumps(payload))
+                r_json = r.json()
+                if r.status_code == 403:
+                  return UTStampResult.FORBIDDEN
+                if r.status_code == 200 and r_json['message'] == 'success' and r_json['all_success']:
+                  return UTStampResult.SUCCESS
+                if r.status_code == 200 and len(r_json['failed_chunks']) > 0 and not r_json['all_success']:
+                  failed_hash = []
+                  for chunk in r_json['failed_chunks']:
+                    for hash in chunk:
+                      failed_hash.append(hash)
+                  if len(failed_hash) == len(hash_list):
+                    return UTStampResult.COLLISION
+                  else:
+                    return UTStampResult.SOME_COLLISION
+                return UTStampResult.ERROR
+            except Exception as e:
+                tqdm.write(f"Error stamping {payload}: {e}, retrying...")
+                continue
+        message = f"Unable to stamp {payload} after {self.cli_args.retries} retries"
+        raise ConnectionAbortedError(message)
+
+    def call_query(self, hash_key) -> str:
+        payload: dict = {"hash": hash_key}
+        endpoint: str = self.cli_args.endpoint
+        url: str = urljoin(endpoint, "submission/query")
+
+        for _ in range(self.cli_args.retries):
+            # retry if the server returns an error
+            try:
+                r = requests.get(url, params=payload)
+                r_json = r.json()
+                if r.status_code == 200:
+                  return r.text
+                elif r.status_code == 404:
+                    return "submission is not exists"
+                elif r.status_code == 408:
+                    time = datetime.datetime.fromtimestamp(float(r_json["message"])/1000.0)
+                    return f"submission is stamped at {time.isoformat()}"
+                return UTStampResult.ERROR.human_readable()
+            except Exception as e:
+                tqdm.write(f"Error stamping {payload}: {e}, retrying...")
+                continue
+        message = f"Unable to query {hash_key} after {self.cli_args.retries} retries"
+        raise ConnectionAbortedError(message)
 
     def stamp(self):
         if self.cli_args.s:
@@ -40,142 +132,66 @@ class UTStampCLI(object):
             self.stamp_files()
 
     def stamp_files(self):
-        print("Scanning files... ", end='')
+        tqdm.write("Scanning files... ", end='')
         try:
             files = self.resolve_files()
         except ValueError as err:
-            print(err)
+            tqdm.write(err)
             return
-        print("Found {0} files.".format(len(files)))
+        tqdm.write("Found {0} files.".format(len(files)))
 
-        print("Uploading files...")
+        hash_list = []
         for path, file in tqdm(files):
-            res = self.submit_files(path, file)
+          relpath = os.path.join(path, file)
+          checksum = self.sha256_checksum4file(relpath)
+          tqdm.write(f"Stamping {relpath} | hash: {checksum}")
+          hash_list.append(checksum)
 
-            if res == COLLISION:
-                tqdm.write("collision: {0}".format(os.path.join(path, file)))
-            elif res == ERROR:
-                tqdm.write("failure: {0}".format(os.path.join(path, file)))
+        tqdm.write("Submitting file hash list...")
+        res = self.call_stamp(hash_list)
+        tqdm.write(res.human_readable())
 
     def stamp_string(self):
         args = self.cli_args
 
-        # use paths[0] to hold string
-        content = args.paths[0]
-        hex_dig = self.sha256_checksum4text(content)
-        print(hex_dig)
-
-        payload = {
-            'submit_data': {
-                'request': {
-                    'submit_data': [
-                        {'hash_key': hex_dig}
-                    ]
-                }
-            }
-        }
-
-        r = self.request_api(payload)
-        # r = requests.post(args.endpoint, data=json.dumps(payload))
-        veracity = self.verify_response(r.json(), hex_dig)
-        if veracity == SUCCESS:
-            print("success.")
-        elif veracity == COLLISION:
-            print("the text has already been stamped. You can query the status now.")
-        else:
-            print("error")
-
-        return
+        hash_list = []
+        for path in tqdm(args.paths):
+          hex_dig = self.sha256_checksum4text(path)
+          tqdm.write(f"Stamping {path} | hash: {hex_dig}")
+          hash_list.append(hex_dig)
+        # write messages according to the result
+        res = self.call_stamp(hash_list)
+        tqdm.write(res.human_readable())
 
     def query_hash(self):
         args = self.cli_args
-        payload = {
-            "data_query": {
-                "request": {
-                    "token_id": args.hash
-                }
-            }
-        }
-
-        # r = requests.post(args.endpoint, data=json.dumps(payload))
-        r = self.request_api(payload)
-        print(json.dumps(r.json(), indent=2))
+        result = self.call_query(args.hash)
+        tqdm.write(result)
 
     def resolve_files(self):
-        paths, recursive, \
-        depth, hidden_files = \
-            self.cli_args.paths, self.cli_args.r, \
-            self.cli_args.d, self.cli_args.hidden_files
+        paths, recursive, depth, hidden_files = \
+            self.cli_args.paths, self.cli_args.r, self.cli_args.d, self.cli_args.hidden_files
 
-        files = []
+        files = [os.path.split(path) for path in paths if os.path.isfile(path)]
         recursive_files = []
+
         for path in paths:
-            if os.path.isfile(path):
-                files.extend([os.path.split(path)])
-
-            elif os.path.isdir(path):
-                if recursive:
-
-                    curdepth = 0
-                    for root, dirs, curfiles in os.walk(path):
-                        for file in curfiles:
-                            recursive_files.extend([(root, file)])
-
-                        curdepth = curdepth + 1
-                        if curdepth >= depth and depth != 0:
-                            break
-
-                else:
+            if os.path.isdir(path):
+                if not recursive:
                     raise ValueError(
-                        "Can't process directory {0} with -r flag.".format(path))
+                        "Can't process directory {0} without -r flag.".format(path))
 
-            else:
-                raise ValueError("Can't find {0}".format(path))
+                current_depth = 0
+                for root, dirs, current_files in os.walk(path):
+                    recursive_files.extend([(root, file) for file in current_files])
+                    current_depth += 1
+                    if (current_depth >= depth) and depth != 0:
+                        break
 
         if not hidden_files:
-            recursive_files = list(
-                filter(lambda pathfile: pathfile[1][0] != '.', recursive_files))
+            recursive_files = [pathfile for pathfile in recursive_files if pathfile[1][0] != '.']
 
         return files + recursive_files
-
-    def submit_files(self, path, file):
-        args = self.cli_args
-
-        relpath = os.path.join(path, file)
-        checksum = self.sha256_checksum4file(relpath)
-        inner_payload = {'hash_key': checksum}
-
-        if args.include_path:
-            inner_payload['customer_tag'] = ''.join(
-                ['file://',
-                 os.uname().nodename,
-                 os.path.abspath(relpath)])
-
-        if args.user:
-            inner_payload['user_id'] = args.user
-
-        payload = {
-            'submit_data': {
-                'request': {
-                    'submit_data': [
-                        inner_payload
-                    ]
-                }
-            }
-        }
-
-        for i in range(args.retries):
-            # r = requests.post(args.endpoint, data=json.dumps(payload))
-            r = self.request_api(payload)
-
-            # output hash val to user, otherwise they do not know how to query
-            print(relpath + ' | hash: ' + checksum)
-            veracity = self.verify_response(r.json(), checksum)
-
-            if veracity in {SUCCESS, COLLISION}:
-                return veracity
-
-        return ERROR
 
     # https://gist.github.com/rji/b38c7238128edf53a181#file-sha256-py
     @staticmethod
@@ -194,53 +210,27 @@ class UTStampCLI(object):
 
         return hex_dig
 
-    @staticmethod
-    def verify_response(payload, checksum):
-        success_payload = {
-            'submit_data': {
-                'response': {}
-            }
-        }
-
-        collision_payload = {
-            "submit_data": {
-                "response": {
-                    "error": [
-                        {"failed_hash_key": checksum}
-                    ]
-                }
-            }
-        }
-
-        # when two items are the same, deepdiff returns {}, i.e., false!
-        if DeepDiff(payload, success_payload):
-            if DeepDiff(payload, collision_payload):
-                return ERROR
-            return COLLISION
-        return SUCCESS
-
     # Checks value is positive integer
     @staticmethod
     def check_positive(value):
-        ivalue = int(value)
-        if ivalue <= 0:
+        int_value = int(value)
+        if int_value <= 0:
             raise argparse.ArgumentTypeError(
                 "{0} is an invalid positive int value".format(value))
-        return ivalue
+        return int_value
 
 
 # Handler for stamp subcommand
-def stamp(cli):
+def stamp_handler(cli):
     cli.stamp()
 
 
 # Handler for query subcommand
-def query(cli):
+def query_handler(cli):
     cli.query_hash()
 
 
 def init_parser():
-
     parser = argparse.ArgumentParser(description="UTStamp command line tool")
     parser.add_argument('--endpoint', default='https://api.utstamp.com/submit',
                         help="defaults to https://api.utstamp.com/submit")
@@ -250,28 +240,26 @@ def init_parser():
                         help="defaults to 3")
 
     subparsers = parser.add_subparsers(
-                help="run -h with subcommand for additional help")
+        help="run -h with subcommand for additional help")
 
     stamp_subparser = subparsers.add_parser('stamp', help='stamps files')
-    stamp_subparser.set_defaults(func=stamp)
+    stamp_subparser.set_defaults(func=stamp_handler)
     stamp_subparser.add_argument('paths', nargs='+')
     stamp_subparser.add_argument('-s', action='store_true', default=False,
-                help="stamp string instead of files")
+                                 help="stamp string instead of files")
     stamp_subparser.add_argument('-r', action='store_true', default=False,
-                help="whether to recursively upload files from subdirectories")
+                                 help="whether to recursively upload files from subdirectories")
     stamp_subparser.add_argument('-d', type=UTStampCLI.check_positive, default=0,
-                help="how deep to recurse (the lowest value of 1 does not step into any subdirectories)")
+                                 help="how deep to recurse (the lowest value of 1 does not step into any "
+                                      "subdirectories)")
     stamp_subparser.add_argument('--hidden-files', action='store_true',
-                default=False, help="includes files starting with . (only has an effect when used with -r)")
-    stamp_subparser.add_argument('--include-path', action='store_true', default=False,
-                help="include path to file and file name in submission")
-    stamp_subparser.add_argument('--user',
-                help="user_id for submission")
+                                 default=False,
+                                 help="includes files starting with . (only has an effect when used with -r)")
 
     query_subparser = subparsers.add_parser('query', help='query for stamps')
-    query_subparser.set_defaults(func=query)
+    query_subparser.set_defaults(func=query_handler)
     query_subparser.add_argument('hash',
-                help="queries a hash/string instead of stamping files")
+                                 help="queries a SHA256 hash instead of stamping files")
 
     args = parser.parse_args()
 
