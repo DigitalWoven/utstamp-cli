@@ -85,12 +85,8 @@ class UTStampCLI(object):
                   return UTStampResult.FORBIDDEN
                 if r.status_code == 200 and r_json['message'] == 'success' and r_json['all_success']:
                   return UTStampResult.SUCCESS
-                if r.status_code == 200 and len(r_json['failed_chunks']) > 0 and not r_json['all_success']:
-                  failed_hash = []
-                  for chunk in r_json['failed_chunks']:
-                    for hash in chunk:
-                      failed_hash.append(hash)
-                  if len(failed_hash) == len(hash_list):
+                if r.status_code == 200 and r_json['failed_count'] > 0 and not r_json['all_success']:
+                  if r_json['failed_count'] == len(hash_list):
                     return UTStampResult.COLLISION
                   else:
                     return UTStampResult.SOME_COLLISION
